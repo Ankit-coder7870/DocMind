@@ -11,6 +11,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -18,9 +19,9 @@ import java.util.List;
 public class DocumentMetaDataService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentMetaDataService.class);
-    private final DocumentMetaDataRepo documentMetaDataRepo;\
+    private final DocumentMetaDataRepo documentMetaDataRepo;
     private final DocumentParseService parseService;
-    private final DocumentIngestService ingestService;
+    private final DocumentIngestionService ingestService;
 
     //method to upload and parse document
     public DocumentResponseDto UploadAndProcess(MultipartFile file) {
@@ -33,6 +34,7 @@ public class DocumentMetaDataService {
                 contentType(contentType)
                 .fileSize(file.getSize())
                 .status(DocumentStatus.UPLOADING)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         //save the document metadata
