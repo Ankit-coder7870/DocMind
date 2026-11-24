@@ -15,27 +15,43 @@ spring:
         format_sql: true
 
   # OpenAI configurations
+#  ai:
+#    openai:
+#      api-key: ${OPENAI_API_KEY:demo-key}
+#      chat:
+#        options:
+#          model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+#          temperature: 0.2
+#      embedding:
+#        options:
+#          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
   ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:demo-key}
+    model:
+      chat: ollama
+      embedding: ollama
+
+    ollama:
+      base-url: http://localhost:11434
+
       chat:
+        model: qwen3.5:4b
         options:
-          model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
           temperature: 0.2
+
       embedding:
-        options:
-          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+        model: nomic-embed-text
 
     vectorstore:
       pgvector:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: 1536
+        dimensions: 768
         table-name: vector_store
         schema-name: public
         initialize-schema: true
 
-  servlet:
+servlet:
     multipart:
       max-file-size: 25MB
       max-request-size: 50MB
