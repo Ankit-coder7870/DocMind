@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -55,5 +56,18 @@ public class DocumentMetaDataService {
                 .status(documentMetaData.getStatus())
                 .message("Document successfully processed and indexed")
                 .build();
+    }
+
+    public List<DocumentResponseDto> uploadMultipleDocuments(List<MultipartFile> files) {
+
+        List<DocumentResponseDto> responseDtos = new ArrayList<>();
+
+        for (MultipartFile file : files) {
+            DocumentResponseDto result = this.UploadAndProcess(file);
+            responseDtos.add(result);
+        }
+
+        return responseDtos;
+
     }
 }

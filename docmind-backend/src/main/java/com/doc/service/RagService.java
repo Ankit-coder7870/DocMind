@@ -1,14 +1,13 @@
 package com.doc.service;
 
 import com.doc.config.AppProperties;
-import com.doc.dto.CitationDto;
-import com.doc.dto.SearchRequestDto;
-import com.doc.dto.SearchResultDto;
+import com.doc.dto.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -19,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 
 @Service
@@ -29,6 +29,39 @@ public class RagService {
     private final VectorStore vectorStore;
     private final AppProperties appProperties;
     private final ChatClient chatClient;
+
+    //to ask anything related to document
+    public ChatResponseDto askQuestion(ChatRequestDto request){
+
+        long startTime = System.currentTimeMillis();
+        log.info("Processing query: '{}', scoped documentId: {}", request.getQuestion(), request.getDocumentId());
+
+        List<Document> similarDocuments = this.retrieveRelevantDocuments(
+                request.getQuestion(),
+                request.getDocumentId(),
+                request.getTopK(),
+                request.getMinSimilarity()
+
+        );
+
+        List<CitationDto> citationDtos = similarDocuments.stream().map(this::mapToCitation).toList();
+
+        String contextText = buildContextString(similarDocuments);
+
+        //you have to use conversationId to remember the conversation
+        //ChatMemory
+        //ChatMemoryRepository
+        String answer = this.chatClient.prompt()
+                          .system(s -> s.param("doc_context",contextText))
+                          .user(request.getQuestion())
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID,request.getConversationId()))
+                .call().content();
+
+        long responseTime = System.currentTimeMillis() - startTime;
+        log.info("Completed Q&A in {} ms with {} citations", responseTime, citationDtos.size());
+        return ChatResponseDto.builder().answer(answer).conversationId(request.getConversationId() != null ? request.getConversationId() : UUID.randomUUID().toString()).citations(citationDtos).responseTimeMs(responseTime).build();
+    }
+
 
     public SearchResultDto searchSimilarChunks(SearchRequestDto request) {
 
@@ -69,6 +102,21 @@ public class RagService {
         return CitationDto.builder().documentId(docId).fileName((String) meta.getOrDefault("fileName", "Unknown")).chunkIndex(chunkIndex).pageNumber(pageNumber).snippet(document.getText()).similarityScore(score).metadata(meta).build();
     }
 
+    //Generation of Context String
+    private String buildContextString(List<Document> similarDocuments) {
+        if (similarDocuments == null || similarDocuments.isEmpty()) {
+            return "";
+        }
+
+        return similarDocuments.stream().map(doc -> {
+            String fileName = (String) doc.getMetadata().getOrDefault("fileName", "unknown file");
+            Object page = doc.getMetadata().getOrDefault("pageNumber", "N/A");
+            return String.format("[Source: %s | Page: %s]\n%s", fileName, page, doc.getText());
+        }).collect(Collectors.joining("\n\n---\n\n"));
+
+    }
+
+    //    this is very important document that fetches the similar result from vector db
     private List<Document> retrieveRelevantDocuments(@NotBlank(message = "Query cannot be empty") String query, UUID documentId, Integer topK, Double similaritySearch) {
 
         int effectiveTopK = (topK != null && topK > 0) ? topK : appProperties.getRag().getTopK();

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @RequestMapping("/api/v1/documents")
 @RestController
@@ -30,6 +31,7 @@ public class DocumentController {
     private final DocumentMetaDataService documentService;
     private final DocumentMetaDataRepo documentRepo;
 
+    //api to upload single file
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Upload and index a document(PDF, DOCX, TEXT, MD, CSV)",
@@ -50,5 +52,27 @@ public class DocumentController {
                         .message("Documents uploaded and indexed successfully")
                         .build()
         );
+    }
+
+    //api to upload multiple file
+    @PostMapping(value = "/upload-multiple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Upload and index multiple documents simultaneously",
+            description = "This api is used to upload and index multiple documents."
+
+    )
+    public ResponseEntity<ApiResponse<List<DocumentResponseDto>>> uploadMultiple(@RequestParam("files") List<MultipartFile> files){
+            List<DocumentResponseDto> responseDtos = documentService.uploadMultipleDocuments(files);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(
+                            ApiResponse.<List<DocumentResponseDto>>
+                                    builder()
+                                    .message("Document deleted successfully")
+                                    .success(true)
+                                    .timestamp(LocalDateTime.now())
+                                    .data(responseDtos)
+                                    .build()
+                    );
+
     }
 }
