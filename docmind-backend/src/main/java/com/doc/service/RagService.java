@@ -13,6 +13,7 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 import java.util.List;
@@ -20,7 +21,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-
+/**
+ * Handles document-based question answering using RAG.
+ * Retrieves relevant document chunks, builds context, and generates
+ * AI responses with conversation memory support.
+ * Supports both synchronous and streaming responses.
+ */
 @Service
 @RequiredArgsConstructor
 public class RagService {
@@ -62,6 +68,32 @@ public class RagService {
         return ChatResponseDto.builder().answer(answer).conversationId(request.getConversationId() != null ? request.getConversationId() : UUID.randomUUID().toString()).citations(citationDtos).responseTimeMs(responseTime).build();
     }
 
+    //this is for stream
+    public Flux<String> streamQuestionAnswer(ChatRequestDto requestDto){
+
+        log.info("Streaming query: '{}'", requestDto.getQuestion());
+
+        List<Document> similarDocuments = this.retrieveRelevantDocuments(
+                requestDto.getQuestion(),
+                requestDto.getDocumentId(),
+                requestDto.getTopK(),
+                requestDto.getMinSimilarity()
+
+        );
+
+        List<CitationDto> citationDtos = similarDocuments.stream().map(this::mapToCitation).toList();
+
+        String contextText = buildContextString(similarDocuments);
+
+        return chatClient.prompt()
+                .system(s-> s.param("doc_context",contextText))
+                .user(requestDto.getQuestion())
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, requestDto.getConversationId()))
+                .stream()
+                .content()
+                .concatWith(Flux.just("[DONE]"));
+
+    }
 
     public SearchResultDto searchSimilarChunks(SearchRequestDto request) {
 
